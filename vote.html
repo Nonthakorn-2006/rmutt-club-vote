@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>หน้าโหวต - Club Vote 2026</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+    <nav class="navbar navbar-dark bg-dark sticky-top mb-4">
+        <div class="container d-flex justify-content-between">
+            <a class="navbar-brand" href="index.html">← กลับหน้าแรก</a>
+            <div class="d-flex align-items-center gap-2">
+                <span class="text-white me-1" id="userDisplay">กำลังตรวจสอบสิทธิ์...</span>
+                <button class="btn btn-sm btn-outline-danger d-none" id="logoutBtn" onclick="handleLogout()">ออกจากระบบ</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container text-center my-5 d-none" id="loginScreen">
+        <div class="card p-5 shadow-sm mx-auto" style="max-width: 450px; border-radius: 15px;">
+            <h3 class="fw-bold mb-4">🔐 เข้าสู่ระบบเพื่อโหวตชมรม</h3>
+            <p class="text-muted mb-4">กรุณาเข้าสู่ระบบด้วยบัญชี Google ของคุณเพื่อรักษาสิทธิ์ (1 ท่านต่อ 1 สิทธิ์)</p>
+            <button class="btn btn-danger btn-lg w-100" onclick="handleGoogleLogin()">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" alt="Google" style="width:20px; margin-right:10px;">
+                เข้าสู่ระบบด้วย Google
+            </button>
+        </div>
+    </div>
+
+    <div class="container mb-5 d-none" id="voteScreen">
+        <h2 class="text-center fw-bold mb-4">💜 ระบบโหวตชมรมที่ชื่นชอบ</h2>
+        
+        <div id="votedAlert" class="alert alert-success text-center d-none fw-bold shadow-sm mb-4">
+            ✅ คุณได้ใช้สิทธิ์โหวตเรียบร้อยแล้ว
+        </div>
+
+        <input type="text" id="searchInput" class="form-control form-control-lg mb-4 shadow-sm" placeholder="🔍 ค้นหาชื่อชมรม หรือ ไอดี (เช่น 1, ดนตรี)">
+        <div class="row g-4" id="voteContainer">
+            </div>
+    </div>
+
+    <div class="modal fade" id="confirmVoteModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold">ยืนยันการโหวต</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <h4 id="confirmClubName" class="text-primary mb-3"></h4>
+                    <p id="confirmClubDetail" class="text-muted"></p>
+                    <div class="alert alert-warning">คุณแน่ใจใช่ไหม? (กดยืนยันแล้วไม่สามารถเปลี่ยนใจได้)</div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+                    <button type="button" class="btn btn-success" id="confirmVoteBtn">ยืนยันการโหวต</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="supabase-config.js"></script>
+    <script src="utils.js"></script>
+    <script src="vote.js"></script>
+</body>
+</html>
