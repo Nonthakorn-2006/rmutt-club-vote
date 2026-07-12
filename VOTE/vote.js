@@ -3,6 +3,8 @@ let clubsData = [];
 let selectedClubId = null;
 let hasVoted = false; // ตัวแปรเก็บสถานะว่าโหวตหรือยัง
 let votedClubId = null; // เก็บไอดีชมรมที่เคยโหวตไปแล้ว
+let isAdmin = false;
+let systemConfig = null;
 
 // ตรวจสอบสถานะล็อกอินตอนเปิดหน้าเว็บมา
 document.addEventListener('DOMContentLoaded', async () => {
@@ -27,12 +29,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('userDisplay').innerText = "ยังไม่ได้เข้าสู่ระบบ";
         } else {
             currentUserEmail = session.user.email;
-            document.getElementById('userDisplay').innerText = ` ${currentUserEmail}`;
+            const userDisplayEl = document.getElementById('userDisplay');
+            userDisplayEl.innerHTML = `👤 ${escapeHtml(currentUserEmail)}`;
+            userDisplayEl.classList.remove('text-white');
+            userDisplayEl.classList.add('btn', 'btn-success');
             document.getElementById('logoutBtn').classList.remove('d-none');
             
             document.getElementById('loginScreen').classList.add('d-none');
             document.getElementById('voteScreen').classList.remove('d-none');
-            
+            await checkSystemAndAdmin();
             // สเต็ปใหม่: เช็คก่อนเลยว่าคนนี้เคยโหวตหรือยัง?
             await checkUserVoteStatus();
         }
@@ -40,6 +45,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error("Fatal Error:", err);
     }
 });
+
+//ฟังก์ชันเช็คว่าเป็นแอดมินหรือไม่ และดึงค่าตั้งค่าระบบ
+async function checkSystemAndAdmin() {
+    // เช็คแอดมิน
+    const { data: adminData } = await db.from('admins').select('email').eq('email', currentUserEmail).maybeSingle();
+    if (adminData) isAdmin = true;
+
+    // ดึงค่าตั้งค่าระบบ
+    const { data: configData } = await db.from('system_config').select('*').eq('id', 1).single();
+    systemConfig = configData;
+}
 
 // ฟังก์ชันเช็คประวัติการโหวต
 async function checkUserVoteStatus() {
@@ -105,6 +121,7 @@ async function fetchClubsForVote() {
 }
 
 // เรนเดอร์ Card ชมรม
+// เรนเดอร์ Card ชมรม
 function renderClubs(data) {
     const container = document.getElementById('voteContainer');
     container.innerHTML = '';
@@ -119,30 +136,50 @@ function renderClubs(data) {
         let cardBorderClass = 'border-primary';
         let titleColorClass = 'text-primary';
         
-        // --- ระบบเช็คปุ่ม: ถ้าเคยโหวตแล้ว ให้ล็อกปุ่มทั้งหมด ---
-        if (hasVoted) {
+        // --- 1. โค้ดส่วนที่เพิ่มมาใหม่: เช็คว่าแอดมินปิดโหวต หรือหมดเวลาหรือยัง ---
+        const now = new Date();
+        // เช็คว่ามีค่า systemConfig ส่งมาไหม ถ้ามีให้เอาเวลามาคำนวณ
+        const closeTime = systemConfig && systemConfig.close_time ? new Date(systemConfig.close_time) : null;
+        const isTimeOver = closeTime && now > closeTime;
+        // ถ้าระบบ voting_open เป็น false หรือ เวลาปัจจุบันเลยเวลาที่ตั้งไว้ ระบบจะถือว่าปิดโหวต
+        const isVotingClosed = systemConfig && (!systemConfig.voting_open || isTimeOver);
+
+
+        // --- 2. ระบบเช็คปุ่ม: จัดลำดับเงื่อนไขใหม่ ---
+        if (isVotingClosed && !hasVoted) {
+            // กรณีที่ 1: หมดเวลาโหวตหรือแอดมินปิดระบบ (และคนนี้ยังไม่ได้โหวต) ล็อกปุ่มให้กดไม่ได้
+            buttonHTML = `<button class="btn btn-secondary mt-auto w-100" disabled style="opacity: 0.7;">⏳ ปิดรับคะแนนโหวตแล้ว</button>`;
+            cardBorderClass = 'border-secondary';
+            titleColorClass = 'text-secondary';
+
+        } else if (hasVoted) {
+            // กรณีที่ 2: โค้ดเดิมของคุณ ถ้าเคยโหวตแล้ว
             if (club.id === votedClubId) {
-                // ชมรมที่ผู้ใช้เลือกโหวตไป (ทำให้เป็นสีเขียว เพื่อให้รู้ว่าโหวตอันนี้)
+                // ชมรมที่ผู้ใช้เลือกโหวตไป (เขียว)
                 buttonHTML = `<button class="btn btn-success mt-auto w-100" disabled>✅ คุณโหวตชมรมนี้ไปแล้ว</button>`;
                 cardBorderClass = 'border-success';
                 titleColorClass = 'text-success';
             } else {
-                // ชมรมอื่นๆ ที่ไม่ได้เลือก (ทำให้เป็นสีเทา กดไม่ได้)
+                // ชมรมอื่นๆ ที่ไม่ได้เลือก (เทา)
                 buttonHTML = `<button class="btn btn-secondary mt-auto w-100" disabled style="opacity: 0.5;">หมดสิทธิ์โหวต</button>`;
                 cardBorderClass = 'border-secondary';
                 titleColorClass = 'text-secondary';
             }
+
         } else {
-            // ถ้ายังไม่เคยโหวต เป็นปุ่มสีน้ำเงินปกติ
-            buttonHTML = `<button class="btn btn-primary mt-auto w-100" onclick="prepareVote(${club.id}, '${club.name}', '${club.detail_full || ''}')">โหวตชมรมนี้</button>`;
+            // กรณีที่ 3: โค้ดเดิมของคุณ (ระบบเปิดอยู่ + ยังไม่เคยโหวต) เป็นปุ่มสีน้ำเงินปกติ
+            // ใช้ data-club-id แทนการฝังชื่อ/รายละเอียดชมรมลงใน onclick="" โดยตรง
+            // เพราะการฝังข้อความดิบแบบนั้นเสี่ยงต่อ XSS และจะพังทันทีถ้าชื่อชมรมมีเครื่องหมาย ' อยู่
+            buttonHTML = `<button class="btn btn-primary mt-auto w-100 vote-btn" data-club-id="${club.id}">โหวตชมรมนี้</button>`;
         }
 
+        // วาดการ์ดออกมา (escapeHtml ป้องกันไม่ให้ชื่อ/คำอธิบายที่มี HTML/สคริปต์ปนมาถูกรันบนหน้าเว็บ)
         container.innerHTML += `
             <div class="col-md-6 col-lg-4">
                 <div class="card club-card h-100 shadow-sm ${cardBorderClass}">
                     <div class="card-body text-center d-flex flex-column">
-                        <h5 class="fw-bold ${titleColorClass}">#${club.id} ${club.name}</h5>
-                        <p class="small text-muted">${club.description || ''}</p>
+                        <h5 class="fw-bold ${titleColorClass}">#${club.id} ${escapeHtml(club.name)}</h5>
+                        <p class="small text-muted">${escapeHtml(club.description || '')}</p>
                         ${buttonHTML}
                     </div>
                 </div>
@@ -150,6 +187,15 @@ function renderClubs(data) {
         `;
     });
 }
+
+// รับคลิกปุ่ม "โหวตชมรมนี้" ทั้งหมดผ่าน event delegation (แทนการใช้ onclick="" ฝังข้อมูลดิบ)
+document.getElementById('voteContainer').addEventListener('click', (e) => {
+    const btn = e.target.closest('.vote-btn');
+    if (!btn) return;
+    const clubId = parseInt(btn.dataset.clubId, 10);
+    const club = clubsData.find(c => c.id === clubId);
+    if (club) prepareVote(club.id, club.name, club.detail_full || '');
+});
 
 // ระบบค้นหาแบบ Real-time
 document.getElementById('searchInput').addEventListener('input', (e) => {

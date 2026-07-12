@@ -115,6 +115,13 @@ a {
   line-height: 1;
 }
 
+/* ตอนล็อกอินแล้ว ให้หน้าตาเหมือนปุ่มสีเขียวในหน้า index.html เป๊ะๆ */
+#userDisplay.btn-success {
+  padding: 10px 22px !important;
+  border: 2px solid var(--line) !important;
+  gap: 6px;
+}
+
 .navbar .d-flex.align-items-center.gap-2 {
   flex-wrap: wrap;
   justify-content: flex-end;
@@ -176,6 +183,14 @@ a {
   background-color: var(--lime) !important;
   border-color: var(--line) !important;
   color: var(--ink) !important;
+  box-shadow: var(--shadow-sm);
+}
+
+/* ปุ่ม "ผลคะแนน (Total)" โดยเฉพาะ ให้ hover เป็นม่วงเข้มแทนเขียวมะนาว */
+.btn-total:hover {
+  background-color: var(--violet-deep) !important;
+  border-color: var(--line) !important;
+  color: #fff !important;
   box-shadow: var(--shadow-sm);
 }
 
@@ -405,6 +420,32 @@ h3.fw-bold {
 #leaderboardContainer .list-group-item:first-child {
   background: linear-gradient(90deg, #F4FFE0 0%, #ffffff 60%);
   animation: riseIn 0.45s ease both, pulseGlow 2.4s ease-in-out 0.6s infinite;
+}
+
+/* ไฮไลท์ชมรมที่ผู้ใช้ปัจจุบันโหวตไป */
+#leaderboardContainer .my-vote-item {
+  background: linear-gradient(90deg, #EFEAFF 0%, #ffffff 65%) !important;
+  border-left: 6px solid var(--violet) !important;
+  position: relative;
+}
+
+#leaderboardContainer .my-vote-item h5 {
+  color: var(--violet-deep);
+}
+
+#leaderboardContainer .my-vote-tag {
+  display: inline-block;
+  font-family: 'Kanit', sans-serif;
+  font-weight: 600;
+  font-size: 0.72rem;
+  background: var(--violet);
+  color: #fff;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  margin-left: 8px;
+  vertical-align: middle;
+  transform: translateY(-1px);
 }
 
 #leaderboardContainer h5 {

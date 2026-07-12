@@ -13,11 +13,14 @@
 
     <!-- Navbar -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top">
-        <div class="container">
+        <div class="container d-flex justify-content-between align-items-center">
             <a class="navbar-brand" style="font-size: 40px;" href="index.html">Club Vote 2026</a>
-            <div>
-                <a href="vote.html" class="btn btn-primary me-2">เข้าสู่ระบบโหวต (Vote)</a>
-                <a href="total.html" class="btn btn-outline-light">ผลคะแนน (Total)</a>
+            <div class="d-flex gap-2 align-items-center">
+                <a href="admin.html" class="btn btn-warning d-none fw-bold" id="adminBtn">⚙️ Admin Dashboard</a>
+                
+                <a href="vote.html" class="btn btn-primary" id="loginNavBtn">เข้าสู่ระบบ (Login)</a>
+                
+                <a href="total.html" class="btn btn-outline-light btn-total">ผลคะแนน (Total)</a>
             </div>
         </div>
     </nav>
@@ -32,41 +35,96 @@
 
     <!-- Club Grid -->
     <div class="container mb-5">
-        <h3 class="mb-4 text-center fw-bold text-white">รายชื่อชมรมทั้งหมด (41 ชมรม)</h3>
+        <h3 class="mb-4 mt-4 text-center fw-bold text-black">รายชื่อชมรมทั้งหมด (41 ชมรม)</h3>
         <div class="row g-4" id="clubContainer">
             <!-- ข้อมูลชมรมจะถูกดึงมาแสดงตรงนี้ด้วย JS -->
         </div>
     </div>
 
     <script src="supabase-config.js"></script>
+    <script src="utils.js"></script>
+
     <script>
-        // ดึงข้อมูลชมรมมาแสดงหน้าแรก
+        // 1. ฟังก์ชันดึงข้อมูลชมรมมาแสดง (ของเดิม)
         async function fetchClubs() {
-            // แก้คำสั่งจาก supabase.from เป็น db.from
             const { data, error } = await db.from('clubs').select('*').order('id', { ascending: true });
             
             if (error) {
-                console.error(error);
+                console.error("Fetch Clubs Error:", error);
                 return;
             }
 
             const container = document.getElementById('clubContainer');
-            data.forEach(club => {
-                container.innerHTML += `
-                    <div class="col-md-6 col-lg-4">
-                        <div class="card club-card h-100 shadow-sm">
-                            <img src="${club.image_url}" class="card-img-top" alt="${club.name}">
-                            <div class="card-body d-flex flex-column">
-                                <h5 class="card-title fw-bold">#${club.id} ${club.name}</h5>
-                                <p class="card-text text-muted">${club.description}</p>
-                                <a href="vote.html" class="btn btn-outline-primary mt-auto">ไปหน้าโหวต</a>
+            if (data && data.length > 0) {
+                container.innerHTML = ''; // ล้างค่าโหลด
+                data.forEach(club => {
+                    container.innerHTML += `
+                        <div class="col-md-6 col-lg-4">
+                            <div class="card club-card h-100 shadow-sm">
+                                <img src="${escapeHtml(club.image_url)}" class="card-img-top" alt="${escapeHtml(club.name)}">
+                                <div class="card-body d-flex flex-column">
+                                    <h5 class="card-title fw-bold">#${club.id} ${escapeHtml(club.name)}</h5>
+                                    <p class="card-text text-muted">${escapeHtml(club.description)}</p>
+                                    <a href="vote.html" class="btn btn-outline-primary mt-auto">ไปหน้าโหวต</a>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                `;
-            });
+                    `;
+                });
+            }
         }
+
+        // 2. ฟังก์ชันเช็คสถานะล็อกอินและสิทธิ์แอดมิน (ปรับปรุงใหม่)
+        async function checkUserStatus() {
+            try {
+                // เช็คว่ามี session ล็อกอินค้างอยู่ไหม
+                const { data: { session }, error: sessionError } = await db.auth.getSession();
+                
+                if (sessionError) throw sessionError;
+
+                const loginNavBtn = document.getElementById('loginNavBtn');
+                const adminBtn = document.getElementById('adminBtn');
+
+                if (session && session.user) {
+                    const userEmail = session.user.email;
+                    console.log("✅ ผู้ใช้ล็อกอินอยู่:", userEmail);
+                    
+                    // เปลี่ยนปุ่มล็อกอินเป็นชื่ออีเมล และเปลี่ยนเป็นสีเขียว
+                    if (loginNavBtn) {
+                        loginNavBtn.innerHTML = `👤 ${userEmail}`;
+                        loginNavBtn.classList.remove('btn-primary');
+                        loginNavBtn.classList.add('btn-success');
+                    }
+
+                    // ไปเช็คในตาราง admins ว่าอีเมลนี้เป็นแอดมินไหม
+                    const { data: adminData, error: adminError } = await db
+                        .from('admins')
+                        .select('email')
+                        .eq('email', userEmail)
+                        .maybeSingle();
+
+                    if (adminError) {
+                        console.error("❌ เช็คแอดมินไม่สำเร็จ:", adminError.message);
+                    }
+
+                    if (adminData) {
+                        console.log("👑 ยืนยันสิทธิ์: ผู้ใช้นี้เป็น Admin");
+                        // เปิดให้เห็นปุ่มจัดการระบบ
+                        if (adminBtn) adminBtn.classList.remove('d-none');
+                    } else {
+                        console.log("👤 ผู้ใช้ทั่วไป (ไม่ใช่ Admin)");
+                    }
+                } else {
+                    console.log("⚪ ยังไม่ได้ล็อกอิน");
+                }
+            } catch (error) {
+                console.error("❌ เกิดข้อผิดพลาดในระบบเช็คสิทธิ์:", error);
+            }
+        }
+
+        // สั่งให้ 2 ฟังก์ชันทำงานทันทีที่โหลดหน้าเว็บ
         fetchClubs();
+        checkUserStatus();
     </script>
 </body>
 </html>

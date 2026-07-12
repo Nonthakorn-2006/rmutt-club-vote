@@ -2,6 +2,44 @@ async function fetchLeaderboard() {
     console.log("กำลังพยายามเชื่อมต่อ API ของ Supabase...");
     
     try {
+        // 1. ตรวจสอบผู้ใช้ปัจจุบัน
+        const { data: { session } } = await db.auth.getSession();
+        const userEmail = session ? session.user.email : null;
+
+        // 2. ตรวจสอบว่าเป็นแอดมินหรือไม่
+        let isAdmin = false;
+        if (userEmail) {
+            const { data: adminData } = await db.from('admins').select('email').eq('email', userEmail).maybeSingle();
+            if (adminData) isAdmin = true;
+        }
+
+        // 2.5 เช็คว่าผู้ใช้คนนี้เคยโหวตชมรมไหนไปแล้ว (เพื่อไฮไลท์ในลีดเดอร์บอร์ด)
+        let myVoteClubId = null;
+        if (userEmail) {
+            const { data: myVote } = await db
+                .from('votes')
+                .select('club_id')
+                .eq('email', userEmail)
+                .maybeSingle();
+            if (myVote) myVoteClubId = myVote.club_id;
+        }
+
+        // 3. ดึงการตั้งค่าระบบ
+        const { data: config } = await db.from('system_config').select('show_total').eq('id', 1).single();
+        
+        // 4. เงื่อนไขการบล็อก
+        // ถ้าโหมด show_total ปิดอยู่ (false) และ "ไม่ใช่แอดมิน" ให้บล็อก
+        if (config && config.show_total === false && !isAdmin) {
+            const container = document.getElementById('leaderboardContainer');
+            container.innerHTML = `
+                <div class="text-center p-5">
+                    <h4 class="text-muted fw-bold">🔒 ผลคะแนนยังไม่เปิดเผย</h4>
+                    <p>ระบบจะประกาศผลคะแนนให้ทราบอีกครั้งหลังจากปิดโหวต</p>
+                    <a href="index.html" class="btn btn-primary mt-3">กลับหน้าแรก</a>
+                </div>
+            `;
+            return; // หยุดการทำงาน ไม่ต้องไปดึงข้อมูลโหวต
+        }
         // เช็คก่อนเลยว่าตัวแปร db (Supabase) ถูกโหลดมาพร้อมไหม
         if (typeof db === 'undefined') {
             throw new Error("หาตัวแปร 'db' ไม่เจอ! คุณอาจจะลืมใส่ <script src='supabase-config.js'></script> ไว้ก่อนไฟล์ total.js ในหน้า HTML");
@@ -67,11 +105,16 @@ async function fetchLeaderboard() {
             else if (index === 1) rankBadge = '🥈 อันดับ 2';
             else if (index === 2) rankBadge = '🥉 อันดับ 3';
 
+            // เช็คว่านี่คือชมรมที่ผู้ใช้คนปัจจุบันโหวตไปหรือไม่ เพื่อไฮไลท์ให้เด่น
+            const isMine = myVoteClubId !== null && club.id === myVoteClubId;
+            const itemClass = isMine ? 'list-group-item d-flex justify-content-between align-items-center p-3 my-vote-item' : 'list-group-item d-flex justify-content-between align-items-center p-3';
+            const myTag = isMine ? '<span class="my-vote-tag">⭐ โหวตของคุณ</span>' : '';
+
             container.innerHTML += `
-                <div class="list-group-item d-flex justify-content-between align-items-center p-3">
+                <div class="${itemClass}">
                     <div class="w-100">
                         <div class="d-flex justify-content-between mb-2">
-                            <h5 class="mb-0 fw-bold">${rankBadge} : ${club.name}</h5>
+                            <h5 class="mb-0 fw-bold">${rankBadge} : ${escapeHtml(club.name)} ${myTag}</h5>
                             <span class="badge bg-success fs-6">${club.score} โหวต</span>
                         </div>
                         <div class="progress" style="height: 10px;">
