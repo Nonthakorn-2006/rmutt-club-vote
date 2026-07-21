@@ -35,7 +35,7 @@
 
     <!-- Club Grid -->
     <div class="container mb-5">
-        <h3 class="mb-4 mt-4 text-center fw-bold text-black">รายชื่อชมรมทั้งหมด (41 ชมรม)</h3>
+        <h3 class="mb-4 mt-4 text-center fw-bold text-black">รายชื่อชมรมทั้งหมด (40 ชมรม)</h3>
         <div class="row g-4" id="clubContainer">
             <!-- ข้อมูลชมรมจะถูกดึงมาแสดงตรงนี้ด้วย JS -->
         </div>
@@ -64,7 +64,7 @@
                                 <img src="${escapeHtml(club.image_url)}" class="card-img-top" alt="${escapeHtml(club.name)}">
                                 <div class="card-body d-flex flex-column">
                                     <h5 class="card-title fw-bold">#${club.id} ${escapeHtml(club.name)}</h5>
-                                    <p class="card-text text-muted">${escapeHtml(club.description)}</p>
+                                    <p class="card-text text-muted">โซน: ${escapeHtml(club.zone)}</p>
                                     <a href="vote.html" class="btn btn-outline-primary mt-auto">ไปหน้าโหวต</a>
                                 </div>
                             </div>

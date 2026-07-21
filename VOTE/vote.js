@@ -120,8 +120,7 @@ async function fetchClubsForVote() {
     }
 }
 
-// เรนเดอร์ Card ชมรม
-// เรนเดอร์ Card ชมรม
+// 1. เรนเดอร์ Card ชมรม
 function renderClubs(data) {
     const container = document.getElementById('voteContainer');
     container.innerHTML = '';
@@ -136,50 +135,37 @@ function renderClubs(data) {
         let cardBorderClass = 'border-primary';
         let titleColorClass = 'text-primary';
         
-        // --- 1. โค้ดส่วนที่เพิ่มมาใหม่: เช็คว่าแอดมินปิดโหวต หรือหมดเวลาหรือยัง ---
+        // เช็คว่าแอดมินปิดโหวต หรือหมดเวลาหรือยัง
         const now = new Date();
-        // เช็คว่ามีค่า systemConfig ส่งมาไหม ถ้ามีให้เอาเวลามาคำนวณ
         const closeTime = systemConfig && systemConfig.close_time ? new Date(systemConfig.close_time) : null;
         const isTimeOver = closeTime && now > closeTime;
-        // ถ้าระบบ voting_open เป็น false หรือ เวลาปัจจุบันเลยเวลาที่ตั้งไว้ ระบบจะถือว่าปิดโหวต
         const isVotingClosed = systemConfig && (!systemConfig.voting_open || isTimeOver);
 
-
-        // --- 2. ระบบเช็คปุ่ม: จัดลำดับเงื่อนไขใหม่ ---
         if (isVotingClosed && !hasVoted) {
-            // กรณีที่ 1: หมดเวลาโหวตหรือแอดมินปิดระบบ (และคนนี้ยังไม่ได้โหวต) ล็อกปุ่มให้กดไม่ได้
             buttonHTML = `<button class="btn btn-secondary mt-auto w-100" disabled style="opacity: 0.7;">⏳ ปิดรับคะแนนโหวตแล้ว</button>`;
             cardBorderClass = 'border-secondary';
             titleColorClass = 'text-secondary';
-
         } else if (hasVoted) {
-            // กรณีที่ 2: โค้ดเดิมของคุณ ถ้าเคยโหวตแล้ว
             if (club.id === votedClubId) {
-                // ชมรมที่ผู้ใช้เลือกโหวตไป (เขียว)
                 buttonHTML = `<button class="btn btn-success mt-auto w-100" disabled>✅ คุณโหวตชมรมนี้ไปแล้ว</button>`;
                 cardBorderClass = 'border-success';
                 titleColorClass = 'text-success';
             } else {
-                // ชมรมอื่นๆ ที่ไม่ได้เลือก (เทา)
                 buttonHTML = `<button class="btn btn-secondary mt-auto w-100" disabled style="opacity: 0.5;">หมดสิทธิ์โหวต</button>`;
                 cardBorderClass = 'border-secondary';
                 titleColorClass = 'text-secondary';
             }
-
         } else {
-            // กรณีที่ 3: โค้ดเดิมของคุณ (ระบบเปิดอยู่ + ยังไม่เคยโหวต) เป็นปุ่มสีน้ำเงินปกติ
-            // ใช้ data-club-id แทนการฝังชื่อ/รายละเอียดชมรมลงใน onclick="" โดยตรง
-            // เพราะการฝังข้อความดิบแบบนั้นเสี่ยงต่อ XSS และจะพังทันทีถ้าชื่อชมรมมีเครื่องหมาย ' อยู่
             buttonHTML = `<button class="btn btn-primary mt-auto w-100 vote-btn" data-club-id="${club.id}">โหวตชมรมนี้</button>`;
         }
 
-        // วาดการ์ดออกมา (escapeHtml ป้องกันไม่ให้ชื่อ/คำอธิบายที่มี HTML/สคริปต์ปนมาถูกรันบนหน้าเว็บ)
+        // วาดการ์ดออกมา (เปลี่ยนเป็นโซน)
         container.innerHTML += `
             <div class="col-md-6 col-lg-4">
                 <div class="card club-card h-100 shadow-sm ${cardBorderClass}">
                     <div class="card-body text-center d-flex flex-column">
                         <h5 class="fw-bold ${titleColorClass}">#${club.id} ${escapeHtml(club.name)}</h5>
-                        <p class="small text-muted">${escapeHtml(club.description || '')}</p>
+                        <p class="small text-muted">โซน: ${escapeHtml(club.zone || '-')}</p>
                         ${buttonHTML}
                     </div>
                 </div>
@@ -188,16 +174,16 @@ function renderClubs(data) {
     });
 }
 
-// รับคลิกปุ่ม "โหวตชมรมนี้" ทั้งหมดผ่าน event delegation (แทนการใช้ onclick="" ฝังข้อมูลดิบ)
+// 2. รับคลิกปุ่ม "โหวตชมรมนี้" ทั้งหมดผ่าน event delegation 
 document.getElementById('voteContainer').addEventListener('click', (e) => {
     const btn = e.target.closest('.vote-btn');
     if (!btn) return;
     const clubId = parseInt(btn.dataset.clubId, 10);
     const club = clubsData.find(c => c.id === clubId);
-    if (club) prepareVote(club.id, club.name, club.detail_full || '');
+    if (club) prepareVote(club.id, club.name, club.zone || '-');
 });
 
-// ระบบค้นหาแบบ Real-time
+// 3. ระบบค้นหาแบบ Real-time
 document.getElementById('searchInput').addEventListener('input', (e) => {
     const keyword = e.target.value.toLowerCase();
     const filtered = clubsData.filter(club => 
@@ -207,18 +193,18 @@ document.getElementById('searchInput').addEventListener('input', (e) => {
     renderClubs(filtered);
 });
 
-// เปิด Modal ยืนยันการโหวต
-function prepareVote(id, name, detail) {
+// 4. เปิด Modal ยืนยันการโหวต
+function prepareVote(id, name, zone) {
     if (hasVoted) return; // ป้องกันการแอบรันฟังก์ชันผ่าน Console
 
     selectedClubId = id;
     document.getElementById('confirmClubName').innerText = name;
-    document.getElementById('confirmClubDetail').innerText = detail || "ไม่มีรายละเอียดเพิ่มเติม";
+    document.getElementById('confirmClubDetail').innerText = "โซน: " + zone;
     const confirmModal = new bootstrap.Modal(document.getElementById('confirmVoteModal'));
     confirmModal.show();
 }
 
-// ยิงข้อมูลบันทึกผลโหวต
+// 5. ยิงข้อมูลบันทึกผลโหวต
 document.getElementById('confirmVoteBtn').addEventListener('click', async () => {
     const btn = document.getElementById('confirmVoteBtn');
     btn.disabled = true;
