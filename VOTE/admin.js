@@ -165,24 +165,25 @@ async function fetchLiveResults() {
 
     try {
         const { data: clubs, error: clubError } = await db.from('clubs').select('id, name');
-        const { data: votes, error: voteError } = await db.from('votes').select('club_id');
+        // ใช้ get_vote_counts() แทนการ select ตาราง votes ตรงๆ (RLS จำกัดให้เห็นแค่แถวตัวเอง)
+        const { data: voteCountsRaw, error: voteError } = await db.rpc('get_vote_counts');
 
         if (clubError || voteError) {
+            console.error('Live results error:', clubError || voteError);
             container.innerHTML = '<div class="text-center p-4 text-danger">ไม่สามารถคำนวณคะแนนได้เนื่องจาก API ขัดข้อง</div>';
             return;
         }
 
-        // นับจำนวนโหวต
+        // นับจำนวนโหวตจากผลลัพธ์ที่ฟังก์ชันรวมมาให้แล้ว
         const voteCounts = {};
-        if (votes && votes.length > 0) {
-            votes.forEach(vote => {
-                if (vote.club_id) {
-                    voteCounts[vote.club_id] = (voteCounts[vote.club_id] || 0) + 1;
-                }
+        let totalVotes = 0;
+        if (voteCountsRaw && voteCountsRaw.length > 0) {
+            voteCountsRaw.forEach(row => {
+                voteCounts[row.club_id] = Number(row.vote_count);
+                totalVotes += Number(row.vote_count);
             });
         }
 
-        const totalVotes = votes ? votes.length : 0;
         let leaderboard = clubs.map(club => {
             const score = voteCounts[club.id] || 0;
             const percent = totalVotes === 0 ? 0 : Math.round((score / totalVotes) * 100);

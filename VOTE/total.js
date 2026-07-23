@@ -48,8 +48,10 @@ async function fetchLeaderboard() {
         // ดึงข้อมูลชมรม
         const { data: clubs, error: clubError } = await db.from('clubs').select('id, name');
         
-        // ดึงข้อมูลโหวต
-        const { data: votes, error: voteError } = await db.from('votes').select('club_id');
+        // ดึงยอดโหวต — ใช้ฟังก์ชัน get_vote_counts() แทนการ select ตาราง votes ตรงๆ
+        // เพราะตาราง votes มี RLS ที่จำกัดให้เห็นแค่แถวของตัวเอง การ select ตรงๆ
+        // จะทำให้นับคะแนนรวมได้ไม่ครบ (เห็นแค่โหวตของตัวเอง)
+        const { data: voteCountsRaw, error: voteError } = await db.rpc('get_vote_counts');
 
         // เช็ค Error จากฝั่ง Supabase โดยตรง
         if (clubError) {
@@ -60,12 +62,12 @@ async function fetchLeaderboard() {
         
         if (voteError) {
             console.error('Error fetching votes:', voteError);
-            alert('❌ API ตาราง Votes มีปัญหา: ' + voteError.message);
+            alert('❌ API นับคะแนนโหวตมีปัญหา: ' + voteError.message + '\n\nถ้าเจอ error ว่าหาฟังก์ชันไม่เจอ ให้ไปสร้างฟังก์ชัน get_vote_counts() ใน Supabase SQL Editor ก่อน');
             return;
         }
 
         console.log("✅ ดึงข้อมูลสำเร็จ! ข้อมูลชมรม:", clubs);
-        console.log("✅ ดึงข้อมูลสำเร็จ! ข้อมูลโหวต:", votes);
+        console.log("✅ ดึงข้อมูลสำเร็จ! ยอดโหวตต่อชมรม:", voteCountsRaw);
 
         // เช็คว่าตารางว่างเปล่าไหม
         const container = document.getElementById('leaderboardContainer');
@@ -74,18 +76,17 @@ async function fetchLeaderboard() {
             return;
         }
 
-        // นับคะแนนโหวต (จัดกลุ่มตาม club_id)
+        // นับคะแนนโหวต (จัดกลุ่มตาม club_id) จากผลลัพธ์ที่ฟังก์ชันรวมมาให้แล้ว
         const voteCounts = {};
-        if (votes && votes.length > 0) {
-            votes.forEach(vote => {
-                if(vote.club_id) {
-                    voteCounts[vote.club_id] = (voteCounts[vote.club_id] || 0) + 1;
-                }
+        let totalVotes = 0;
+        if (voteCountsRaw && voteCountsRaw.length > 0) {
+            voteCountsRaw.forEach(row => {
+                voteCounts[row.club_id] = Number(row.vote_count);
+                totalVotes += Number(row.vote_count);
             });
         }
 
         // นำคะแนนไปผูกกับชื่อชมรม และคำนวณ %
-        const totalVotes = votes ? votes.length : 0;
         let leaderboard = clubs.map(club => {
             const score = voteCounts[club.id] || 0;
             const percent = totalVotes === 0 ? 0 : Math.round((score / totalVotes) * 100);
